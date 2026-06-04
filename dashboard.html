@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Squad Readiness Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --club1: #1a3a8f;
+    --club2: #c8102e;
+    --club1-subtle: #e8edf8;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --bg: #f8f8f7;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.09);
+    --text: #111110;
+    --muted: #6b6b68;
+    --green: #16a34a;
+    --green-bg: #f0fdf4;
+    --amber: #d97706;
+    --amber-bg: #fffbeb;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--club1);
+    padding: 0 32px;
+    height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .club-badge {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--club2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .club-badge svg { width: 16px; height: 16px; fill: #fff; }
+  .header h1 { font-size: 15px; font-weight: 500; color: #fff; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .tag {
+    font-size: 11px; padding: 4px 10px; border-radius: 20px;
+    background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.85);
+  }
+  .btn-sm {
+    font-size: 12px; padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.3);
+    background: transparent; color: #fff;
+    cursor: pointer; font-family: var(--font);
+    display: flex; align-items: center; gap: 5px;
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: rgba(255,255,255,0.15); }
+  .btn-sm svg { width: 13px; height: 13px; fill: #fff; }
+
+  /* ── MAIN ── */
+  .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 60px; }
+
+  /* ── ZONE SUMMARY ── */
+  .zone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 28px; }
+  .zone-card {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+    border-top: 3px solid transparent;
+  }
+  .zone-card.atk { border-top-color: #22c55e; }
+  .zone-card.bld { border-top-color: #f59e0b; }
+  .zone-card.ctl { border-top-color: #ef4444; }
+  .z-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .z-label { font-size: 11px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; }
+  .atk .z-label { color: var(--green); }
+  .bld .z-label { color: var(--amber); }
+  .ctl .z-label { color: var(--red); }
+  .z-count { font-size: 36px; font-weight: 600; line-height: 1; }
+  .atk .z-count { color: var(--green); }
+  .bld .z-count { color: var(--amber); }
+  .ctl .z-count { color: var(--red); }
+  .z-sub { font-size: 12px; color: var(--muted); }
+  .z-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 14px; overflow: hidden; }
+  .z-bar-fill { height: 100%; border-radius: 2px; }
+  .atk .z-bar-fill { background: #22c55e; }
+  .bld .z-bar-fill { background: #f59e0b; }
+  .ctl .z-bar-fill { background: #ef4444; }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+  }
+  .search-wrap {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px 14px;
+    flex: 1; max-width: 280px;
+  }
+  .search-wrap svg { width: 15px; height: 15px; fill: var(--muted); flex-shrink: 0; }
+  .search-wrap input {
+    border: none; background: transparent; font-size: 13px;
+    color: var(--text); outline: none; width: 100%; font-family: var(--font);
+  }
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fbtn {
+    font-size: 12px; padding: 6px 14px; border-radius: 20px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-family: var(--font);
+    transition: all 0.12s;
+  }
+  .fbtn.on { background: var(--club1); color: #fff; border-color: var(--club1); }
+  .right-actions { display: flex; gap: 8px; align-items: center; }
+  .btn-outline {
+    font-size: 12px; padding: 7px 16px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; font-family: var(--font);
+    display: flex; align-items: center; gap: 5px;
+    transition: border-color 0.15s;
+  }
+  .btn-outline:hover { border-color: var(--club1); }
+  .btn-outline svg { width: 13px; height: 13px; fill: currentColor; }
+  .btn-accent {
+    font-size: 12px; padding: 7px 16px; border-radius: var(--radius-sm);
+    border: none; background: var(--club1); color: #fff;
+    cursor: pointer; font-family: var(--font);
+    display: flex; align-items: center; gap: 5px;
+    transition: opacity 0.15s;
+  }
+  .btn-accent:hover { opacity: 0.88; }
+  .btn-accent svg { width: 13px; height: 13px; fill: #fff; }
+
+  /* ── SQUAD GRID ── */
+  .squad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px;
+  }
+  .pcard {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid var(--border); padding: 18px;
+    transition: border-color 0.15s, transform 0.12s;
+    cursor: default;
+  }
+  .pcard:hover { border-color: rgba(0,0,0,0.2); transform: translateY(-1px); }
+  .pcard-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--bg); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    overflow: hidden; flex-shrink: 0;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .pinfo { flex: 1; min-width: 0; }
+  .pname { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ppos { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .ring-area { flex-shrink: 0; }
+  .big-score { font-size: 30px; font-weight: 600; line-height: 1; }
+  .score-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 14px; }
+  .m-cell { background: var(--bg); border-radius: 7px; padding: 8px 10px; }
+  .m-label { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+  .m-val { font-size: 15px; font-weight: 600; }
+  .m-bar { height: 2px; border-radius: 1px; background: var(--border); margin-top: 5px; }
+  .m-fill { height: 2px; border-radius: 1px; }
+  .note-flag {
+    margin-top: 10px; display: flex; align-items: flex-start; gap: 6px;
+    background: var(--red-bg); border-radius: var(--radius-sm);
+    padding: 8px 10px; font-size: 11px; color: var(--red);
+  }
+  .note-flag svg { width: 13px; height: 13px; fill: var(--red); flex-shrink: 0; margin-top: 1px; }
+  .no-resp {
+    text-align: center; padding: 16px 0;
+    font-size: 12px; color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .no-resp svg { width: 22px; height: 22px; fill: var(--border); }
+
+  /* ── MODAL OVERLAY ── */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 200;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 28px; width: 100%; max-width: 460px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; }
+  .form-group input, .form-group select {
+    width: 100%; padding: 9px 12px; font-size: 13px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg); color: var(--text);
+    font-family: var(--font); outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--club1); }
+  .avatar-upload-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .av-preview {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--bg); border: 1px dashed var(--border);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .av-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .av-preview svg { width: 22px; height: 22px; fill: var(--muted); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-cancel {
+    flex: 1; padding: 10px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: transparent;
+    font-size: 13px; font-family: var(--font); cursor: pointer; color: var(--text);
+  }
+  .btn-save {
+    flex: 2; padding: 10px; border-radius: var(--radius-sm);
+    border: none; background: var(--club1); color: #fff;
+    font-size: 13px; font-family: var(--font); cursor: pointer;
+  }
+  .modal-err { font-size: 12px; color: var(--red); margin-top: 8px; }
+
+  /* ── THEME STRIP ── */
+  .theme-strip {
+    display: none; background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 32px; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .theme-strip.open { display: flex; }
+  .theme-strip label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .theme-strip input[type=color] {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--border); padding: 2px; cursor: pointer;
+  }
+  .theme-strip span { font-size: 12px; color: var(--muted); }
+
+  /* ── LOADING ── */
+  .loading { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .spinner {
+    width: 32px; height: 32px; border: 2px solid var(--border);
+    border-top-color: var(--club1); border-radius: 50%;
+    animation: spin 0.7s linear infinite; margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    .main { padding: 20px 16px 60px; }
+    .header { padding: 0 16px; }
+    .zone-grid { grid-template-columns: 1fr; }
+    .toolbar { flex-direction: column; align-items: flex-start; }
+    .search-wrap { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="club-badge">
+      <svg viewBox="0 0 24 24"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+    </div>
+    <h1 id="club-name-h">Squad readiness</h1>
+  </div>
+  <div class="header-right">
+    <span class="tag" id="header-date"></span>
+    <span class="tag" id="resp-count">— / — responses</span>
+    <button class="btn-sm" onclick="toggleTheme()">
+      <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18 1 1 0 0 0 .16-1.99 7 7 0 0 1 .01-14.01A1 1 0 0 0 12 3z"/><path d="M15.5 2.1l-1 1.73a5 5 0 0 1 0 8.34l1 1.73A7 7 0 0 0 15.5 2.1z"/></svg>
+      Theme
+    </button>
+    <button class="btn-sm" onclick="loadDashboard()">
+      <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 0 0-8 8 8 8 0 0 0 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18a6 6 0 0 1-6-6 6 6 0 0 1 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+      Refresh
+    </button>
+  </div>
+</div>
+
+<div class="theme-strip" id="theme-strip">
+  <label>
+    <input type="color" id="c1-pick" value="#1a3a8f" oninput="applyTheme()">
+    Primary colour
+  </label>
+  <label>
+    <input type="color" id="c2-pick" value="#c8102e" oninput="applyTheme()">
+    Secondary colour
+  </label>
+  <span>Changes apply instantly</span>
+</div>
+
+<div class="main">
+
+  <div class="zone-grid">
+    <div class="zone-card atk">
+      <div class="z-row">
+        <span class="z-label">Attack</span>
+      </div>
+      <div class="z-count" id="cnt-a">—</div>
+      <div class="z-sub" id="sub-a">players</div>
+      <div class="z-bar"><div class="z-bar-fill" id="bar-a" style="width:0%"></div></div>
+    </div>
+    <div class="zone-card bld">
+      <div class="z-row">
+        <span class="z-label">Build</span>
+      </div>
+      <div class="z-count" id="cnt-b">—</div>
+      <div class="z-sub" id="sub-b">players</div>
+      <div class="z-bar"><div class="z-bar-fill" id="bar-b" style="width:0%"></div></div>
+    </div>
+    <div class="zone-card ctl">
+      <div class="z-row">
+        <span class="z-label">Control</span>
+      </div>
+      <div class="z-count" id="cnt-c">—</div>
+      <div class="z-sub" id="sub-c">players</div>
+      <div class="z-bar"><div class="z-bar-fill" id="bar-c" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><path d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      <input type="text" id="search" placeholder="Search player..." oninput="renderGrid()">
+    </div>
+    <div class="filter-row">
+      <button class="fbtn on" onclick="setFilter('all',this)">All</button>
+      <button class="fbtn" onclick="setFilter('responded',this)">Responded</button>
+      <button class="fbtn" onclick="setFilter('pending',this)">Pending</button>
+      <button class="fbtn" onclick="setFilter('flagged',this)">Flagged notes</button>
+    </div>
+    <div class="right-actions">
+      <button class="btn-outline" onclick="openAddModal()">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        Add player
+      </button>
+    </div>
+  </div>
+
+  <div id="grid-area">
+    <div class="loading"><div class="spinner"></div><p>Loading squad...</p></div>
+  </div>
+</div>
+
+<!-- Add Player Modal -->
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <h3>Add player</h3>
+    <div class="avatar-upload-row">
+      <div class="av-preview" id="av-preview">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+      </div>
+      <div>
+        <label class="btn-outline" style="cursor:pointer; display:inline-flex;">
+          Upload photo
+          <input type="file" accept="image/*" style="display:none;" onchange="previewAvatar(this)" id="av-file">
+        </label>
+        <p style="font-size:11px;color:var(--muted);margin-top:4px;">JPG or PNG</p>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Full name *</label>
+      <input type="text" id="new-name" placeholder="e.g. James Hogan">
+    </div>
+    <div class="form-group">
+      <label>Position</label>
+      <input type="text" id="new-pos" placeholder="e.g. Loosehead prop">
+    </div>
+    <div class="form-group">
+      <label>Player email (for login)</label>
+      <input type="email" id="new-email" placeholder="player@email.com">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="addPlayer()">Add to squad</button>
+    </div>
+    <p class="modal-err" id="modal-err"></p>
+  </div>
+</div>
+
+<script>
+// =============================================
+// CONFIG — replace with your Supabase details
+// =============================================
+const SUPABASE_URL = 'https://zbhndqojgkyzakgikjos.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiaG5kcW9qZ2t5emFrZ2lram9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1Nzk0MDQsImV4cCI6MjA5NjE1NTQwNH0.mzeMfSI_dgZZzFQGVlxQxOV53hN7nbYM6dy_yIOfxIs';
+// =============================================
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let players = [];
+let readiness = [];
+let activeFilter = 'all';
+let newAvatarData = null;
+
+// ── INIT ──
+document.getElementById('header-date').textContent =
+  new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+async function loadDashboard() {
+  document.getElementById('grid-area').innerHTML =
+    '<div class="loading"><div class="spinner"></div><p>Loading squad...</p></div>';
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const [{ data: pData }, { data: rData }] = await Promise.all([
+    sb.from('players').select('*').order('name'),
+    sb.from('readiness')
+      .select('*')
+      .gte('submitted_at', today + 'T00:00:00')
+      .lte('submitted_at', today + 'T23:59:59')
+  ]);
+
+  players = pData || [];
+  readiness = rData || [];
+
+  const responded = readiness.length;
+  const total = players.length;
+  document.getElementById('resp-count').textContent = `${responded}/${total} responses`;
+
+  updateZoneSummary();
+  renderGrid();
+}
+
+function getReadiness(playerId) {
+  return readiness.find(r => r.player_id === playerId) || null;
+}
+
+function zoneOf(score) {
+  if (score === null || score === undefined) return 'pending';
+  if (score >= 80) return 'attack';
+  if (score >= 50) return 'build';
+  return 'control';
+}
+
+function barColor(v) {
+  return v >= 8 ? '#22c55e' : v >= 5 ? '#f59e0b' : '#ef4444';
+}
+
+function initials(name) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function updateZoneSummary() {
+  let a = 0, b = 0, c = 0;
+  players.forEach(p => {
+    const r = getReadiness(p.id);
+    const z = zoneOf(r ? r.overall_score : null);
+    if (z === 'attack') a++;
+    else if (z === 'build') b++;
+    else if (z === 'control') c++;
+  });
+  const total = players.length || 1;
+  document.getElementById('cnt-a').textContent = a;
+  document.getElementById('cnt-b').textContent = b;
+  document.getElementById('cnt-c').textContent = c;
+  document.getElementById('sub-a').textContent = `of ${players.length} players`;
+  document.getElementById('sub-b').textContent = `of ${players.length} players`;
+  document.getElementById('sub-c').textContent = `of ${players.length} players`;
+  document.getElementById('bar-a').style.width = Math.round(a / total * 100) + '%';
+  document.getElementById('bar-b').style.width = Math.round(b / total * 100) + '%';
+  document.getElementById('bar-c').style.width = Math.round(c / total * 100) + '%';
+}
+
+function renderGrid() {
+  const q = document.getElementById('search').value.toLowerCase();
+  let list = players.filter(p => p.name.toLowerCase().includes(q));
+
+  if (activeFilter === 'responded') list = list.filter(p => getReadiness(p.id));
+  else if (activeFilter === 'pending') list = list.filter(p => !getReadiness(p.id));
+  else if (activeFilter === 'flagged') list = list.filter(p => {
+    const r = getReadiness(p.id);
+    return r && r.soreness_note;
+  });
+
+  if (list.length === 0) {
+    document.getElementById('grid-area').innerHTML =
+      '<p style="text-align:center;color:var(--muted);padding:40px;font-size:14px;">No players match this filter.</p>';
+    return;
+  }
+
+  document.getElementById('grid-area').innerHTML =
+    '<div class="squad-grid">' + list.map(p => cardHTML(p)).join('') + '</div>';
+}
+
+function cardHTML(p) {
+  const r = getReadiness(p.id);
+  const score = r ? r.overall_score : null;
+  const av = p.image_url
+    ? `<img src="${p.image_url}" alt="${p.name}">`
+    : `<span>${initials(p.name)}</span>`;
+  const scoreColor = score === null ? 'var(--muted)' : score >= 80 ? '#16a34a' : score >= 50 ? '#d97706' : '#dc2626';
+
+  const metricsHTML = r ? `
+    <div class="metrics-grid">
+      ${[['Sleep quality', r.sleep_quality], ['Sleep duration', r.sleep_duration], ['Stress', r.stress], ['Soreness', r.soreness]].map(([l, v]) => `
+        <div class="m-cell">
+          <div class="m-label">${l}</div>
+          <div class="m-val" style="color:${barColor(v)};">${v}<span style="font-size:10px;color:var(--muted);">/10</span></div>
+          <div class="m-bar"><div class="m-fill" style="width:${v * 10}%;background:${barColor(v)};"></div></div>
+        </div>`).join('')}
+    </div>
+    ${r.soreness_note ? `<div class="note-flag">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      <span>${r.soreness_note}</span>
+    </div>` : ''}
+  ` : `<div class="no-resp">
+    <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+    No response today
+  </div>`;
+
+  return `<div class="pcard">
+    <div class="pcard-top">
+      <div class="avatar">${av}</div>
+      <div class="pinfo">
+        <div class="pname">${p.name}</div>
+        <div class="ppos">${p.position || '—'}</div>
+      </div>
+      <div class="ring-area" style="text-align:right;">
+        <div class="big-score" style="color:${scoreColor};">${score !== null ? score : '—'}</div>
+        <div class="score-label">score</div>
+      </div>
+    </div>
+    ${metricsHTML}
+  </div>`;
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderGrid();
+}
+
+// ── THEME ──
+function toggleTheme() {
+  document.getElementById('theme-strip').classList.toggle('open');
+}
+
+function applyTheme() {
+  const c1 = document.getElementById('c1-pick').value;
+  const c2 = document.getElementById('c2-pick').value;
+  document.documentElement.style.setProperty('--club1', c1);
+  document.documentElement.style.setProperty('--club2', c2);
+  document.querySelector('.header').style.background = c1;
+  document.querySelector('.club-badge').style.background = c2;
+}
+
+// ── ADD PLAYER ──
+function openAddModal() {
+  document.getElementById('add-modal').classList.add('open');
+  document.getElementById('modal-err').textContent = '';
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-pos').value = '';
+  document.getElementById('new-email').value = '';
+  document.getElementById('av-preview').innerHTML =
+    '<svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+  newAvatarData = null;
+}
+
+function closeModal() {
+  document.getElementById('add-modal').classList.remove('open');
+}
+
+function previewAvatar(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    newAvatarData = e.target.result;
+    document.getElementById('av-preview').innerHTML =
+      `<img src="${newAvatarData}" alt="preview">`;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function addPlayer() {
+  if (players.length >= 50) {
+    document.getElementById('modal-err').textContent = 'Squad limit of 50 players reached.';
+    return;
+  }
+  const name = document.getElementById('new-name').value.trim();
+  const pos = document.getElementById('new-pos').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  if (!name) { document.getElementById('modal-err').textContent = 'Name is required.'; return; }
+
+  let imageUrl = null;
+  if (newAvatarData) {
+    const file = document.getElementById('av-file').files[0];
+    const ext = file.name.split('.').pop();
+    const path = `avatars/${Date.now()}.${ext}`;
+    const { data: upload, error: upErr } = await sb.storage
+      .from('player-images')
+      .upload(path, file, { upsert: true });
+    if (!upErr) {
+      const { data: urlData } = sb.storage.from('player-images').getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
+    }
+  }
+
+  const { error } = await sb.from('players').insert({ name, position: pos || null, image_url: imageUrl });
+  if (error) { document.getElementById('modal-err').textContent = 'Error adding player. Please try again.'; return; }
+
+  if (email) {
+    await sb.auth.admin?.inviteUserByEmail?.(email).catch(() => {});
+  }
+
+  closeModal();
+  loadDashboard();
+}
+
+// ── REALTIME ──
+sb.channel('readiness-changes')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'readiness' }, payload => {
+    readiness.push(payload.new);
+    updateZoneSummary();
+    renderGrid();
+    const p = players.find(x => x.id === payload.new.player_id);
+    const responded = readiness.length;
+    document.getElementById('resp-count').textContent = `${responded}/${players.length} responses`;
+    if (p) console.log(`New submission from ${p.name}`);
+  })
+  .subscribe();
+
+loadDashboard();
+</script>
+</body>
+</html>

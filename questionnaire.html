@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Readiness Check-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* ── CONFIG: replace with your club colours ── */
+  :root {
+    --club1: #1a3a8f;
+    --club2: #c8102e;
+    --club1-subtle: #e8edf8;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --bg: #f8f8f7;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.09);
+    --text: #111110;
+    --muted: #6b6b68;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 60px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    width: 100%;
+    background: var(--club1);
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .club-dot {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--club2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .club-dot svg { width: 18px; height: 18px; fill: #fff; }
+  .header h1 { font-size: 15px; font-weight: 500; color: #fff; letter-spacing: 0.01em; }
+  .header p { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .player-chip {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: #fff;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .player-chip .avatar-sm {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--club2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 600; color: #fff;
+    overflow: hidden;
+  }
+  .player-chip .avatar-sm img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+  /* ── MAIN WRAPPER ── */
+  .wrap { width: 100%; max-width: 480px; padding: 0 20px; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── LOGIN SCREEN ── */
+  .login-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 36px 32px;
+    text-align: center;
+  }
+  .login-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--club1-subtle);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+  }
+  .login-icon svg { width: 26px; height: 26px; fill: var(--club1); }
+  .login-card h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .login-card p { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 28px; }
+  .email-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-family: var(--font);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+    margin-bottom: 12px;
+  }
+  .email-input:focus { border-color: var(--club1); }
+  .btn-main {
+    width: 100%;
+    padding: 13px;
+    background: var(--club1);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-main:hover { opacity: 0.88; }
+  .btn-main:disabled { opacity: 0.5; cursor: not-allowed; }
+  .msg { font-size: 13px; margin-top: 14px; min-height: 20px; }
+  .msg.success { color: var(--green); }
+  .msg.error { color: var(--red); }
+
+  /* ── ALREADY SUBMITTED ── */
+  .done-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 36px 28px;
+    text-align: center;
+  }
+  .done-ring {
+    width: 70px; height: 70px; margin: 0 auto 20px;
+    position: relative;
+  }
+  .done-ring svg { transform: rotate(-90deg); }
+  .done-score {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 17px; font-weight: 600;
+  }
+  .done-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .done-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .done-metrics {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-top: 24px;
+  }
+  .done-metric {
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: left;
+  }
+  .done-metric .dm-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .done-metric .dm-val { font-size: 20px; font-weight: 600; }
+  .done-metric .dm-bar { height: 3px; border-radius: 2px; background: var(--border); margin-top: 6px; }
+  .done-metric .dm-fill { height: 3px; border-radius: 2px; }
+
+  /* ── QUESTIONNAIRE ── */
+  .q-header {
+    margin-bottom: 24px;
+  }
+  .q-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .q-header p { font-size: 14px; color: var(--muted); }
+
+  .q-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 14px;
+  }
+  .q-card-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .q-card-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .q-card-hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  .score-row {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 5px;
+  }
+  .sbtn {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.12s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sbtn:hover { border-color: var(--club1); color: var(--club1); }
+  .sbtn.sel {
+    background: var(--club1);
+    border-color: var(--club1);
+    color: #fff;
+  }
+  .score-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  /* soreness note */
+  .note-wrap {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .note-wrap.show { display: block; }
+  .note-label {
+    font-size: 12px;
+    color: var(--red);
+    font-weight: 500;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .note-label svg { width: 14px; height: 14px; fill: var(--red); flex-shrink: 0; }
+  .note-ta {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .note-ta:focus { border-color: var(--club1); }
+  .note-ta.required { border-color: var(--red); }
+
+  /* progress bar */
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--club1);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .submit-area { margin-top: 6px; }
+  .err-msg { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; }
+
+  /* ── LOADING ── */
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--club1);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 14px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* responsive */
+  @media (max-width: 420px) {
+    .login-card, .q-card, .done-card { padding: 24px 20px; }
+    .score-row { gap: 3px; }
+    .sbtn { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="club-dot">
+      <svg viewBox="0 0 24 24"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/></svg>
+    </div>
+    <div>
+      <h1 id="club-name">Squad readiness</h1>
+      <p id="header-date"></p>
+    </div>
+  </div>
+  <div id="player-chip" style="display:none;" class="player-chip">
+    <div class="avatar-sm" id="chip-avatar"></div>
+    <span id="chip-name"></span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- Loading -->
+  <div class="screen active" id="screen-loading">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <div class="screen" id="screen-login">
+    <div class="login-card">
+      <div class="login-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+      </div>
+      <h2>Player sign-in</h2>
+      <p>Enter your email address and we'll send you a magic link. Tap it once and you'll be remembered on this device — no password needed.</p>
+      <input class="email-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+      <button class="btn-main" id="login-btn" onclick="sendMagicLink()">Send magic link</button>
+      <p class="msg" id="login-msg"></p>
+    </div>
+  </div>
+
+  <!-- Questionnaire -->
+  <div class="screen" id="screen-questionnaire">
+    <div class="q-header">
+      <h2>Daily check-in</h2>
+      <p id="q-subheading">How are you feeling today?</p>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+
+    <!-- Sleep Quality -->
+    <div class="q-card">
+      <div class="q-card-label">Question 1 of 4</div>
+      <div class="q-card-title">Sleep quality</div>
+      <div class="q-card-hint">How well did you sleep last night? Rate from 1 (very poor) to 10 (excellent).</div>
+      <div class="score-row" id="btn-sleepQ"></div>
+      <div class="score-ends"><span>1 — very poor</span><span>10 — excellent</span></div>
+    </div>
+
+    <!-- Sleep Duration -->
+    <div class="q-card">
+      <div class="q-card-label">Question 2 of 4</div>
+      <div class="q-card-title">Sleep duration</div>
+      <div class="q-card-hint">How much sleep did you get? Rate from 1 (very little) to 10 (plenty).</div>
+      <div class="score-row" id="btn-sleepD"></div>
+      <div class="score-ends"><span>1 — very little</span><span>10 — plenty</span></div>
+    </div>
+
+    <!-- Stress -->
+    <div class="q-card">
+      <div class="q-card-label">Question 3 of 4</div>
+      <div class="q-card-title">Stress levels</div>
+      <div class="q-card-hint">How stressed are you feeling? Rate from 1 (very stressed) to 10 (completely relaxed).</div>
+      <div class="score-row" id="btn-stress"></div>
+      <div class="score-ends"><span>1 — very stressed</span><span>10 — relaxed</span></div>
+    </div>
+
+    <!-- Soreness -->
+    <div class="q-card">
+      <div class="q-card-label">Question 4 of 4</div>
+      <div class="q-card-title">Muscle soreness</div>
+      <div class="q-card-hint">How sore are your muscles? Rate from 1 (very sore) to 10 (no soreness at all).</div>
+      <div class="score-row" id="btn-soreness"></div>
+      <div class="score-ends"><span>1 — very sore</span><span>10 — no soreness</span></div>
+      <div class="note-wrap" id="note-wrap">
+        <div class="note-label">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+          A note is required when soreness is below 8 — please describe where and how sore you are.
+        </div>
+        <textarea class="note-ta" id="soreness-note" placeholder="e.g. Tightness in left hamstring after Tuesday's session..."></textarea>
+      </div>
+    </div>
+
+    <div class="submit-area">
+      <button class="btn-main" id="submit-btn" onclick="submitForm()">Submit check-in</button>
+      <p class="err-msg" id="submit-err"></p>
+    </div>
+  </div>
+
+  <!-- Already submitted today -->
+  <div class="screen" id="screen-done">
+    <div class="done-card">
+      <div class="done-ring">
+        <svg width="70" height="70" viewBox="0 0 70 70">
+          <circle cx="35" cy="35" r="28" fill="none" stroke="#e5e5e3" stroke-width="5"/>
+          <circle cx="35" cy="35" r="28" fill="none" id="done-ring-arc"
+            stroke="#22c55e" stroke-width="5"
+            stroke-dasharray="0 176" stroke-linecap="round"/>
+        </svg>
+        <div class="done-score" id="done-score-num">—</div>
+      </div>
+      <h2>Check-in complete</h2>
+      <p id="done-msg">You've already submitted today's readiness check. See you tomorrow!</p>
+      <div class="done-metrics" id="done-metrics"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =============================================
+// CONFIG — replace with your Supabase details
+// =============================================
+const SUPABASE_URL = 'https://zbhndqojgkyzakgikjos.supabase.co/rest/v1/ ';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiaG5kcW9qZ2t5emFrZ2lram9zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1Nzk0MDQsImV4cCI6MjA5NjE1NTQwNH0.mzeMfSI_dgZZzFQGVlxQxOV53hN7nbYM6dy_yIOfxIs';
+// =============================================
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const scores = { sleepQ: null, sleepD: null, stress: null, soreness: null };
+let currentPlayer = null;
+
+// ── INIT ──
+document.getElementById('header-date').textContent =
+  new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await loadPlayer(session.user);
+  } else {
+    show('login');
+  }
+}
+
+async function loadPlayer(user) {
+  const { data: player } = await sb
+    .from('players')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!player) {
+    show('login');
+    document.getElementById('login-msg').textContent =
+      'No player found for this email. Please contact your coach.';
+    document.getElementById('login-msg').className = 'msg error';
+    return;
+  }
+
+  currentPlayer = player;
+  updateChip(player);
+
+  const today = new Date().toISOString().split('T')[0];
+  const { data: existing } = await sb
+    .from('readiness')
+    .select('*')
+    .eq('player_id', player.id)
+    .gte('submitted_at', today + 'T00:00:00')
+    .lte('submitted_at', today + 'T23:59:59')
+    .single();
+
+  if (existing) {
+    showDone(existing);
+  } else {
+    buildForm();
+    show('questionnaire');
+  }
+}
+
+function updateChip(player) {
+  const chip = document.getElementById('player-chip');
+  chip.style.display = 'flex';
+  document.getElementById('chip-name').textContent = player.name.split(' ')[0];
+  const av = document.getElementById('chip-avatar');
+  if (player.image_url) {
+    av.innerHTML = `<img src="${player.image_url}" alt="${player.name}">`;
+  } else {
+    av.textContent = player.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  }
+  document.getElementById('q-subheading').textContent =
+    `Good ${timeOfDay()}, ${player.name.split(' ')[0]}. How are you feeling today?`;
+}
+
+function timeOfDay() {
+  const h = new Date().getHours();
+  return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+}
+
+// ── LOGIN ──
+async function sendMagicLink() {
+  const email = document.getElementById('login-email').value.trim();
+  const msg = document.getElementById('login-msg');
+  const btn = document.getElementById('login-btn');
+  if (!email || !email.includes('@')) {
+    msg.textContent = 'Please enter a valid email address.';
+    msg.className = 'msg error';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href }
+  });
+  if (error) {
+    msg.textContent = 'Something went wrong. Please try again.';
+    msg.className = 'msg error';
+    btn.disabled = false;
+    btn.textContent = 'Send magic link';
+  } else {
+    msg.textContent = 'Magic link sent! Check your email and tap the link.';
+    msg.className = 'msg success';
+    btn.textContent = 'Link sent';
+  }
+}
+
+// Handle magic link redirect
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    await loadPlayer(session.user);
+  }
+});
+
+// ── FORM BUILDER ──
+function buildForm() {
+  buildScoreBtns('btn-sleepQ', 'sleepQ');
+  buildScoreBtns('btn-sleepD', 'sleepD');
+  buildScoreBtns('btn-stress', 'stress');
+  buildScoreBtns('btn-soreness', 'soreness', true);
+}
+
+function buildScoreBtns(containerId, key, isSoreness) {
+  const wrap = document.getElementById(containerId);
+  wrap.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const b = document.createElement('button');
+    b.className = 'sbtn';
+    b.textContent = i;
+    b.onclick = () => {
+      scores[key] = i;
+      wrap.querySelectorAll('.sbtn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      updateProgress();
+      if (isSoreness) checkNote();
+    };
+    wrap.appendChild(b);
+  }
+}
+
+function checkNote() {
+  const nw = document.getElementById('note-wrap');
+  if (scores.soreness !== null && scores.soreness < 8) {
+    nw.classList.add('show');
+  } else {
+    nw.classList.remove('show');
+    document.getElementById('soreness-note').value = '';
+    document.getElementById('soreness-note').classList.remove('required');
+  }
+}
+
+function updateProgress() {
+  const filled = Object.values(scores).filter(v => v !== null).length;
+  document.getElementById('progress-fill').style.width = (filled / 4 * 100) + '%';
+}
+
+// ── SUBMIT ──
+async function submitForm() {
+  const err = document.getElementById('submit-err');
+  err.textContent = '';
+
+  if (Object.values(scores).some(v => v === null)) {
+    err.textContent = 'Please answer all four questions before submitting.';
+    return;
+  }
+
+  const note = document.getElementById('soreness-note').value.trim();
+  if (scores.soreness < 8 && !note) {
+    document.getElementById('soreness-note').classList.add('required');
+    err.textContent = 'Please leave a note about your muscle soreness before submitting.';
+    document.getElementById('soreness-note').focus();
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  const { data, error } = await sb.from('readiness').insert({
+    player_id: currentPlayer.id,
+    sleep_quality: scores.sleepQ,
+    sleep_duration: scores.sleepD,
+    stress: scores.stress,
+    soreness: scores.soreness,
+    soreness_note: note || null
+  }).select().single();
+
+  if (error) {
+    if (error.code === '23505') {
+      err.textContent = "You've already submitted today. Come back tomorrow!";
+    } else {
+      err.textContent = 'Something went wrong. Please try again.';
+      console.error(error);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Submit check-in';
+    return;
+  }
+
+  showDone(data);
+}
+
+// ── DONE SCREEN ──
+function showDone(record) {
+  const score = record.overall_score;
+  const circ = 2 * Math.PI * 28;
+  const dash = score !== null ? (score / 100) * circ : 0;
+  const col = score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+  const arc = document.getElementById('done-ring-arc');
+  arc.setAttribute('stroke', col);
+  arc.setAttribute('stroke-dasharray', `${dash.toFixed(1)} ${circ.toFixed(1)}`);
+  document.getElementById('done-score-num').textContent = score;
+  document.getElementById('done-score-num').style.color = col;
+
+  const metrics = [
+    ['Sleep quality', record.sleep_quality],
+    ['Sleep duration', record.sleep_duration],
+    ['Stress', record.stress],
+    ['Soreness', record.soreness]
+  ];
+  const barCol = v => v >= 8 ? '#22c55e' : v >= 5 ? '#f59e0b' : '#ef4444';
+  document.getElementById('done-metrics').innerHTML = metrics.map(([l, v]) => `
+    <div class="done-metric">
+      <div class="dm-label">${l}</div>
+      <div class="dm-val" style="color:${barCol(v)};">${v}<span style="font-size:12px;color:var(--muted);">/10</span></div>
+      <div class="dm-bar"><div class="dm-fill" style="width:${v * 10}%;background:${barCol(v)};"></div></div>
+    </div>`).join('');
+
+  show('done');
+}
+
+function show(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+init();
+</script>
+</body>
+</html>
